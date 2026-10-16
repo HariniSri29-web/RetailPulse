@@ -1,0 +1,47 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.git/
+.github/
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Python environment and cache
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Excel temporary lock files
+~$*
+
+# Large source and generated datasets
+online_retail_II.xlsx
+retailpulse_prepared.csv
+
+# Generated outputs and experiment tracking
+churn_outputs/
+eda_outputs/
+etl_outputs/
+forecast_outputs/
+inventory_outputs/
+lstm_outputs/
+mlruns/
+monitoring_outputs/
+rfm_outputs/
+shap_outputs/
+
+# Build and editor files
+.pytest_cache/
+.mypy_cache/
+.DS_Store

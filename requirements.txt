@@ -1,0 +1,11 @@
+﻿streamlit
+pandas
+numpy
+matplotlib
+plotly
+scikit-learn
+prophet
+mlflow
+shap
+tensorflow
+openpyxl
