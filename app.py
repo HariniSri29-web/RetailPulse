@@ -173,7 +173,7 @@ st.markdown("""
 # =========================================================
 # 4. LOAD DATA
 # =========================================================
-DATA_FILE = BASE_DIR / "retailpulse_prepared.csv"
+DATA_FILE = BASE_DIR / "retailpulse_prepared.csv.gz"
 
 
 @st.cache_data
