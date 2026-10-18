@@ -1,0 +1,11 @@
+
+RETAILPULSE ETL REPORT
+----------------------
+Source file: online_retail_II.xlsx
+Rows extracted: 1067371
+Rows after cleaning: 1067371
+Rows removed: 0
+Return records: 22950
+Cancelled invoice records: 19494
+Missing customer IDs: 243007
+Output file: D:\Zidio\RetailPulse\etl_outputs\clean_retail_data.csv
