@@ -1,0 +1,2 @@
+Model,MAE,RMSE,MAPE_percent_nonzero_days,TestDays
+LSTM,20158.5,27671.181254149596,42.198,148
