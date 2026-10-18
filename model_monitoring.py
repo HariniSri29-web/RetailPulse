@@ -44,70 +44,57 @@ purchases = df[
 purchases["Customer ID"] = purchases["Customer ID"].astype("int64")
 
 # Build a historical reference customer-feature dataset.
+# Build two comparable 90-day customer-feature snapshots.
 last_date = purchases["InvoiceDate"].max().normalize()
-snapshot_date = last_date - pd.Timedelta(days=90)
 
-history = purchases[
-    purchases["InvoiceDate"] < snapshot_date
-].copy()
+current_snapshot_date = last_date
+reference_snapshot_date = current_snapshot_date - pd.Timedelta(days=90)
 
-customer_features = history.groupby("Customer ID").agg(
-    LastPurchase=("InvoiceDate", "max"),
-    Frequency=("Invoice", "nunique"),
-    Monetary=("TotalAmount", "sum"),
-    TotalUnits=("Quantity", "sum"),
-    UniqueProducts=("StockCode", "nunique")
-).reset_index()
+# Each snapshot uses purchases from the 90 days before its snapshot date.
+def build_customer_features(data, snapshot_date):
+    window_start = snapshot_date - pd.Timedelta(days=90)
 
-customer_features["Recency"] = (
-    snapshot_date - customer_features["LastPurchase"].dt.normalize()
-).dt.days
+    window = data[
+        (data["InvoiceDate"] >= window_start)
+        & (data["InvoiceDate"] < snapshot_date)
+    ].copy()
 
-customer_features["AverageOrderValue"] = (
-    customer_features["Monetary"]
-    / customer_features["Frequency"].clip(lower=1)
-)
+    features = window.groupby("Customer ID").agg(
+        LastPurchase=("InvoiceDate", "max"),
+        Frequency=("Invoice", "nunique"),
+        Monetary=("TotalAmount", "sum"),
+        TotalUnits=("Quantity", "sum"),
+        UniqueProducts=("StockCode", "nunique")
+    ).reset_index()
 
-reference = customer_features[FEATURE_COLUMNS].replace(
-    [np.inf, -np.inf], np.nan
-).dropna()
+    features["Recency"] = (
+        snapshot_date - features["LastPurchase"].dt.normalize()
+    ).dt.days
 
-# Use the later purchase period to create a comparison population.
-recent_start = snapshot_date
-recent_end = purchases["InvoiceDate"].max().normalize()
-
-recent = purchases[
-    (purchases["InvoiceDate"] >= recent_start)
-    & (
-        purchases["InvoiceDate"]
-        <= recent_end + pd.Timedelta(days=1)
-        - pd.Timedelta(seconds=1)
+    features["AverageOrderValue"] = (
+        features["Monetary"]
+        / features["Frequency"].clip(lower=1)
     )
-].copy()
 
-recent_features = recent.groupby("Customer ID").agg(
-    LastPurchase=("InvoiceDate", "max"),
-    Frequency=("Invoice", "nunique"),
-    Monetary=("TotalAmount", "sum"),
-    TotalUnits=("Quantity", "sum"),
-    UniqueProducts=("StockCode", "nunique")
-).reset_index()
+    return features[FEATURE_COLUMNS].replace(
+        [np.inf, -np.inf], np.nan
+    ).dropna()
 
-recent_features["Recency"] = (
-    recent_end - recent_features["LastPurchase"].dt.normalize()
-).dt.days
-
-recent_features["AverageOrderValue"] = (
-    recent_features["Monetary"]
-    / recent_features["Frequency"].clip(lower=1)
+reference = build_customer_features(
+    purchases, reference_snapshot_date
 )
 
-current = recent_features[FEATURE_COLUMNS].replace(
-    [np.inf, -np.inf], np.nan
-).dropna()
+current = build_customer_features(
+    purchases, current_snapshot_date
+)
 
 if reference.empty or current.empty:
     raise ValueError("Reference or comparison data is empty.")
+
+print("Reference snapshot:", reference_snapshot_date.date())
+print("Current snapshot:", current_snapshot_date.date())
+print("Reference customers:", len(reference))
+print("Current customers:", len(current))
 
 # Compare feature distributions using the Population Stability Index (PSI).
 # PSI is a descriptive drift signal, not a formal hypothesis test.
