@@ -247,7 +247,11 @@ page = st.sidebar.radio(
         "Customer Insights",
         "Forecast & Inventory",
         "Data Quality",
-        "Model Monitoring"
+        "Model Monitoring",
+        "Product Performance",
+        "Regional & Geographic Analytics",
+        "Order & Transaction Analytics",
+        "Business Intelligence & Insights"
     ]
 )
 
@@ -1213,6 +1217,628 @@ elif page == "Model Monitoring":
         st.warning(
             "Drift report not found. Run model_monitoring.py first."
         )
+        
+# =========================================================
+# 12. PRODUCT PERFORMANCE
+# =========================================================
+elif page == "Product Performance":
+    st.header("Product Performance Analytics")
+    st.caption(
+        "Analyze product revenue, sales volume, and product contribution."
+    )
+
+    # Product-level summary
+    product_data = (
+        sales.groupby(["StockCode", "Description"], as_index=False)
+        .agg(
+            Revenue=("Revenue", "sum"),
+            Units_Sold=("Quantity", "sum"),
+            Orders=("Invoice", "nunique")
+        )
+    )
+
+    product_data = product_data.sort_values(
+        "Revenue", ascending=False
+    )
+
+    # KPI calculations
+    total_products = product_data["StockCode"].nunique()
+    total_revenue = product_data["Revenue"].sum()
+    total_units = product_data["Units_Sold"].sum()
+    average_revenue = (
+        product_data["Revenue"].mean()
+        if not product_data.empty else 0
+    )
+
+    # KPI cards
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("Unique Products", f"{total_products:,}")
+    c2.metric("Product Revenue", f"{total_revenue:,.2f}")
+    c3.metric("Units Sold", f"{total_units:,.0f}")
+    c4.metric("Average Revenue per Product", f"{average_revenue:,.2f}")
+
+    st.divider()
+
+    # Product search
+    st.subheader("Product Search")
+
+    search = st.text_input(
+        "Search by product name or product code"
+    )
+
+    filtered_products = product_data.copy()
+
+    if search:
+        filtered_products = filtered_products[
+            filtered_products["Description"].astype(str).str.contains(
+                search, case=False, na=False
+            )
+            |
+            filtered_products["StockCode"].astype(str).str.contains(
+                search, case=False, na=False
+            )
+        ]
+
+    # Top 10 products by revenue and units
+    left, right = st.columns(2)
+
+    with left:
+        st.subheader("Top 10 Products by Revenue")
+
+        top_revenue = (
+            product_data.nlargest(10, "Revenue")
+            .sort_values("Revenue")
+        )
+
+        fig = px.bar(
+            top_revenue,
+            x="Revenue",
+            y="Description",
+            orientation="h",
+            template=CHART_TEMPLATE,
+            color="Revenue",
+            color_continuous_scale=["#BFEAE5", TEAL]
+        )
+
+        fig.update_layout(
+            xaxis_title="Revenue",
+            yaxis_title="",
+            coloraxis_showscale=False
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    with right:
+        st.subheader("Top 10 Products by Units Sold")
+
+        top_units = (
+            product_data.nlargest(10, "Units_Sold")
+            .sort_values("Units_Sold")
+        )
+
+        fig = px.bar(
+            top_units,
+            x="Units_Sold",
+            y="Description",
+            orientation="h",
+            template=CHART_TEMPLATE,
+            color_discrete_sequence=[BLUE]
+        )
+
+        fig.update_layout(
+            xaxis_title="Units Sold",
+            yaxis_title=""
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Revenue contribution
+    st.subheader("Product Revenue Contribution")
+
+    if total_revenue > 0:
+        contribution = product_data.nlargest(10, "Revenue").copy()
+        contribution["Contribution (%)"] = (
+            contribution["Revenue"] / total_revenue * 100
+        )
+
+        fig = px.pie(
+            contribution,
+            names="Description",
+            values="Revenue",
+            hole=0.48,
+            template=CHART_TEMPLATE,
+            title="Top 10 Products Revenue Share"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Product details
+    st.subheader("Product Performance Details")
+
+    st.dataframe(
+        filtered_products,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.download_button(
+        "Download Product Performance Report",
+        data=filtered_products.to_csv(index=False).encode("utf-8"),
+        file_name="product_performance_report.csv",
+        mime="text/csv"
+    )
+
+    # Business insights
+    st.divider()
+    st.subheader("Business Insights")
+
+    if not product_data.empty:
+        best_product = product_data.iloc[0]
+        highest_volume = product_data.loc[
+            product_data["Units_Sold"].idxmax()
+        ]
+
+        st.success(
+            f"Top revenue-generating product: "
+            f"{best_product['Description']} "
+            f"with revenue of {best_product['Revenue']:,.2f}."
+        )
+
+        st.info(
+            f"Highest volume product: "
+            f"{highest_volume['Description']} "
+            f"with {highest_volume['Units_Sold']:,.0f} units sold."
+        )
+
+        st.write(
+            "Recommendation: Prioritize stock planning for products "
+            "with consistently high sales volume. Review low-performing "
+            "products before making purchasing decisions."
+        )
+        
+elif page == "Regional & Geographic Analytics":
+
+    st.title("🌍 Regional & Geographic Analytics")
+    st.markdown("Analyze sales performance and customer distribution across countries.")
+
+    # Country-wise aggregation
+    country_data = sales.groupby("Country").agg(
+        Total_Revenue=("Revenue", "sum"),
+        Total_Orders=("Invoice", "nunique"),
+        Total_Units=("Quantity", "sum"),
+        Total_Customers=("Customer ID", "nunique")
+    ).reset_index()
+
+    country_data = country_data.sort_values(
+        "Total_Revenue", ascending=False
+    )
+
+    # KPI metrics
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("🌍 Countries", country_data["Country"].nunique())
+    col2.metric("💰 Total Revenue", f"{country_data['Total_Revenue'].sum():,.2f}")
+    col3.metric("📦 Total Orders", f"{country_data['Total_Orders'].sum():,}")
+    col4.metric("👥 Customers", f"{country_data['Total_Customers'].sum():,}")
+
+    st.divider()
+
+    # Top 10 countries by revenue
+    st.subheader("🏆 Top 10 Countries by Revenue")
+
+    top_countries = country_data.head(10)
+
+    st.bar_chart(
+        top_countries.set_index("Country")["Total_Revenue"]
+    )
+
+    st.divider()
+
+    # Country-wise order analysis
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("📦 Orders by Country")
+        st.bar_chart(
+            top_countries.set_index("Country")["Total_Orders"]
+        )
+
+    with col2:
+        st.subheader("👥 Customers by Country")
+        st.bar_chart(
+            top_countries.set_index("Country")["Total_Customers"]
+        )
+
+    st.divider()
+
+    # Country search
+    st.subheader("🔎 Explore Country Performance")
+
+    selected_country = st.selectbox(
+        "Select a country",
+        sorted(country_data["Country"].dropna().unique())
+    )
+
+    selected_data = country_data[
+        country_data["Country"] == selected_country
+    ]
+
+    if not selected_data.empty:
+        row = selected_data.iloc[0]
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        col1.metric("Revenue", f"{row['Total_Revenue']:,.2f}")
+        col2.metric("Orders", f"{row['Total_Orders']:,}")
+        col3.metric("Units Sold", f"{row['Total_Units']:,}")
+        col4.metric("Customers", f"{row['Total_Customers']:,}")
+
+    st.divider()
+
+    # Complete country report
+    st.subheader("📋 Complete Country Performance Report")
+
+    st.dataframe(
+        country_data.style.format({
+            "Total_Revenue": "{:,.2f}",
+            "Total_Orders": "{:,.0f}",
+            "Total_Units": "{:,.0f}",
+            "Total_Customers": "{:,.0f}"
+        }),
+        use_container_width=True
+    )
+
+    # Business insight
+    best_country = country_data.iloc[0]
+
+    st.success(
+        f"💡 {best_country['Country']} is the highest-revenue country "
+        f"with revenue of {best_country['Total_Revenue']:,.2f}."
+    )
+    
+elif page == "Order & Transaction Analytics":
+
+    st.title("🧾 Order & Transaction Analytics")
+    st.markdown("Explore order patterns, transaction values, and cancellation trends.")
+
+    # Prepare order-level data
+    order_data = sales.groupby("Invoice").agg(
+        Order_Value=("Revenue", "sum"),
+        Total_Quantity=("Quantity", "sum"),
+        Order_Date=("InvoiceDate", "min"),
+        Customer_ID=("Customer ID", "first"),
+        Country=("Country", "first")
+    ).reset_index()
+
+    order_data["Order_Date"] = pd.to_datetime(order_data["Order_Date"])
+    order_data["YearMonth"] = order_data["Order_Date"].dt.to_period("M").astype(str)
+
+    # KPI metrics
+    total_orders = order_data["Invoice"].nunique()
+    total_revenue = order_data["Order_Value"].sum()
+    avg_order_value = (
+        total_revenue / total_orders if total_orders else 0
+    )
+    avg_quantity = (
+        order_data["Total_Quantity"].mean() if total_orders else 0
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("🧾 Total Orders", f"{total_orders:,}")
+    col2.metric("💰 Total Revenue", f"{total_revenue:,.2f}")
+    col3.metric("🛒 Average Order Value", f"{avg_order_value:,.2f}")
+    col4.metric("📦 Avg. Order Quantity", f"{avg_quantity:,.1f}")
+
+    st.divider()
+
+    # Monthly order trend
+    st.subheader("📈 Monthly Order Trend")
+
+    monthly_orders = (
+        order_data.groupby("YearMonth")
+        .size()
+        .reset_index(name="Total_Orders")
+        .sort_values("YearMonth")
+    )
+
+    st.line_chart(
+        monthly_orders.set_index("YearMonth")["Total_Orders"]
+    )
+
+    st.divider()
+
+    # Order value distribution
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("💰 Order Value Distribution")
+        st.bar_chart(
+            order_data.set_index("Invoice")["Order_Value"].head(20)
+        )
+
+    with col2:
+        st.subheader("📦 Order Quantity Distribution")
+        st.bar_chart(
+            order_data.set_index("Invoice")["Total_Quantity"].head(20)
+        )
+
+    st.divider()
+
+    # Top 10 highest-value orders
+    st.subheader("🏆 Top 10 Highest-Value Orders")
+
+    top_orders = order_data.nlargest(10, "Order_Value")
+
+    st.dataframe(
+        top_orders,
+        use_container_width=True
+    )
+
+    st.divider()
+
+    # Country-wise order analysis
+    st.subheader("🌍 Orders by Country")
+
+    country_orders = (
+        order_data.groupby("Country")
+        .size()
+        .reset_index(name="Total_Orders")
+        .sort_values("Total_Orders", ascending=False)
+        .head(10)
+    )
+
+    st.bar_chart(
+        country_orders.set_index("Country")["Total_Orders"]
+    )
+
+    st.divider()
+
+    # Cancellation analysis from original dataset
+    st.subheader("🚫 Cancellation Analysis")
+
+    cancelled_invoices = (
+        df.loc[
+            df["IsCancelledInvoice"],
+            "Invoice"
+        ].nunique()
+    )
+
+    valid_invoices = (
+        df.loc[
+            ~df["IsCancelledInvoice"],
+            "Invoice"
+        ].nunique()
+    )
+
+    col1, col2 = st.columns(2)
+
+    col1.metric("Cancelled Invoices", f"{cancelled_invoices:,}")
+    col2.metric("Non-Cancelled Invoices", f"{valid_invoices:,}")
+
+    st.caption(
+        "Cancellation counts are based on the original dataset. "
+        "An invoice is counted once even if it contains multiple transaction rows."
+    )
+
+    st.divider()
+
+    # Transaction details
+    st.subheader("📋 Order Details")
+
+    search_order = st.text_input(
+        "Search by Invoice Number"
+    )
+
+    filtered_orders = order_data.copy()
+
+    if search_order:
+        filtered_orders = filtered_orders[
+            filtered_orders["Invoice"].astype(str).str.contains(
+                search_order, case=False, na=False
+            )
+        ]
+
+    st.dataframe(
+        filtered_orders.sort_values(
+            "Order_Date", ascending=False
+        ),
+        use_container_width=True
+    )
+    
+elif page == "Business Intelligence & Insights":
+
+    st.title("💡 Business Intelligence & Insights")
+    st.markdown(
+        "An executive overview of business performance, "
+        "growth opportunities, and actionable recommendations."
+    )
+
+    # Prepare business metrics
+    total_revenue = sales["Revenue"].sum()
+    total_orders = sales["Invoice"].nunique()
+    total_customers = sales["Customer ID"].nunique()
+    total_units = sales["Quantity"].sum()
+
+    avg_order_value = (
+        total_revenue / total_orders if total_orders else 0
+    )
+
+    # Executive KPI dashboard
+    st.subheader("📊 Executive Performance Overview")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("💰 Total Revenue", f"{total_revenue:,.2f}")
+    col2.metric("🧾 Total Orders", f"{total_orders:,}")
+    col3.metric("👥 Total Customers", f"{total_customers:,}")
+    col4.metric("📦 Units Sold", f"{total_units:,}")
+
+    st.divider()
+
+    # Monthly revenue analysis
+    st.subheader("📈 Monthly Revenue Performance")
+
+    monthly_revenue = (
+        sales.groupby(sales["InvoiceDate"].dt.to_period("M"))["Revenue"]
+        .sum()
+        .reset_index()
+    )
+
+    monthly_revenue.columns = ["Month", "Revenue"]
+    monthly_revenue["Month"] = monthly_revenue["Month"].astype(str)
+    monthly_revenue = monthly_revenue.sort_values("Month")
+
+    st.line_chart(
+        monthly_revenue.set_index("Month")["Revenue"]
+    )
+
+    # Monthly growth calculation
+    monthly_revenue["Growth_Percentage"] = (
+        monthly_revenue["Revenue"].pct_change() * 100
+    )
+
+    st.subheader("📉 Month-on-Month Revenue Growth")
+
+    st.dataframe(
+        monthly_revenue.tail(12).style.format({
+            "Revenue": "{:,.2f}",
+            "Growth_Percentage": "{:.2f}%"
+        }),
+        use_container_width=True
+    )
+
+    st.divider()
+
+    # Best-performing product
+    st.subheader("🏆 Business Leaders")
+
+    product_performance = (
+        sales.groupby(["StockCode", "Description"])
+        .agg(
+            Revenue=("Revenue", "sum"),
+            Units_Sold=("Quantity", "sum")
+        )
+        .reset_index()
+        .sort_values("Revenue", ascending=False)
+    )
+
+    country_performance = (
+        sales.groupby("Country")["Revenue"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if not product_performance.empty:
+            best_product = product_performance.iloc[0]
+            st.metric(
+                "🥇 Best Product",
+                str(best_product["Description"])[:35],
+                f"Revenue: {best_product['Revenue']:,.2f}"
+            )
+
+    with col2:
+        if not country_performance.empty:
+            best_country = country_performance.index[0]
+            st.metric(
+                "🌍 Top Revenue Country",
+                str(best_country),
+                f"Revenue: {country_performance.iloc[0]:,.2f}"
+            )
+
+    st.divider()
+
+    # Revenue contribution
+    st.subheader("📊 Revenue Contribution")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Top 5 Products**")
+        st.bar_chart(
+            product_performance.head(5).set_index(
+                "Description"
+            )["Revenue"]
+        )
+
+    with col2:
+        st.markdown("**Top 5 Countries**")
+        st.bar_chart(
+            country_performance.head(5)
+        )
+
+    st.divider()
+
+    # Business recommendations
+    st.subheader("🧠 Business Recommendations")
+
+    if not monthly_revenue.empty:
+        if len(monthly_revenue) >= 2:
+            latest_growth = monthly_revenue[
+                "Growth_Percentage"
+            ].iloc[-1]
+
+            if pd.notna(latest_growth):
+                if latest_growth > 0:
+                    st.success(
+                        f"📈 Revenue increased by {latest_growth:.2f}% "
+                        "compared with the previous month. "
+                        "Continue monitoring the successful sales strategies."
+                    )
+                elif latest_growth < 0:
+                    st.warning(
+                        f"⚠️ Revenue decreased by {abs(latest_growth):.2f}% "
+                        "compared with the previous month. "
+                        "Review pricing, demand, and marketing activities."
+                    )
+                else:
+                    st.info(
+                        "Revenue remained unchanged compared with the previous month."
+                    )
+
+    if not product_performance.empty:
+        st.info(
+            f"💡 Focus on the best-performing product: "
+            f"{product_performance.iloc[0]['Description']}. "
+            "Maintain sufficient inventory to support demand."
+        )
+
+    if not country_performance.empty:
+        st.info(
+            f"🌍 {country_performance.index[0]} generates the highest revenue. "
+            "Study its customer and sales patterns to identify opportunities "
+            "in other markets."
+        )
+
+    st.divider()
+
+    # Executive summary
+    st.subheader("📋 Executive Business Summary")
+
+    st.write(
+        f"""
+        - Total business revenue: **{total_revenue:,.2f}**
+        - Total orders processed: **{total_orders:,}**
+        - Unique customers: **{total_customers:,}**
+        - Total units sold: **{total_units:,}**
+        - Average order value: **{avg_order_value:,.2f}**
+        """
+    )
+
+    st.caption(
+        "Business recommendations are generated using rule-based "
+        "analysis of the available sales data."
+    )
+
+
+
+
 
 
 # =========================================================
